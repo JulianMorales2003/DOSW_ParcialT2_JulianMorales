@@ -185,4 +185,4 @@ Si fallan varias condiciones dentro del contexto de pedir un turno, la respuesta
 esto se hace uno a uno, es decir solo entrega un mensaje de error , y va en orden, primero las de entrada, luego revision sonbre existencia de productos y por ultimo las reglas de negocio, se hace así en orden y por etapas porque algunas reglas de negocio y entrada dependen unas de otras entonces
 por esta razón las respuestas deben ser en orden e individuales para cada uno de las condciones o errores que se hayan. 
 
-Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe crear ningun peddido o seguir con el flujo y no modificar datos, y se guyarda en memoria un pedido al estar completo y correcto. 
+Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe crear ningun peddido o seguir con el flujo y no modificar datos, y se guarda en memoria un pedido al estar completo y correcto. 
