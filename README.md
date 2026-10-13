@@ -15,7 +15,7 @@
 
 ## 1. Datos del estudiante
 - **Nombre completo:** Julian Felipe Morales Zambrano
-- **Grupo:** _(completar)_
+- **Grupo:** _1_
 - **Profesor agregado al repositorio:** _(completar: marcar ✔ cuando esté agregado como colaborador)_
 
 ## 2. Descripción del proyecto
