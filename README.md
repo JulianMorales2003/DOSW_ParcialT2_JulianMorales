@@ -162,7 +162,7 @@ Evidencia:
 
 ## Punto 1 Asignación del equipo de Producto - Definición del contrato de la API
 
-### link de excel con la tabla: 
+### link de excel con la tabla en la carpeta de docs con el nombre : [ExcelPrimerPunto.xlsx](docs%2FExcelPrimerPunto.xlsx) 
 
 ### Preguntas para la revisión con Producto:
 
