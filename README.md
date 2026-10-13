@@ -28,7 +28,7 @@ Servicio backend base (Spring Boot + MongoDB) para el parcial práctico del segu
 | Health | `https://<nombre-app>.azurewebsites.net/api/v1/health` |
 | Swagger | `https://<nombre-app>.azurewebsites.net/swagger-ui/index.html` |
 
-Azure no permitió crear el App Service con la suscripción disponible, por lo que las URLs anteriores quedan como referencia (`<nombre-app>` es el nombre del App Service). La configuración de despliegue está completa en el repositorio:
+Azure no me permitió crear el App Service con la suscripción disponible por problemas de la cuenta estudiantil, por lo que las URLs anteriores quedan como referencia (`<nombre-app>` es el nombre del App Service). La configuración de despliegue está completa en el repositorio:
 
 - La imagen Docker se construye y se publica en Docker Hub desde el pipeline.
 - El job `deploy` de [`ci-cd.yml`](.github/workflows/ci-cd.yml) despliega la imagen en Azure App Service.
