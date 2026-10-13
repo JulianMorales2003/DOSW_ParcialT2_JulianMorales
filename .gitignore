@@ -1,0 +1,32 @@
+# Compilados y build
+target/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Credenciales y secretos (nunca al repositorio)
+.env
+.env.*
+*.p12
+*.jks
+*.pem
+
+# Logs
+*.log
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+nbproject/
+.mvn/wrapper/maven-wrapper.jar
+
+# SO
+.DS_Store
+Thumbs.db

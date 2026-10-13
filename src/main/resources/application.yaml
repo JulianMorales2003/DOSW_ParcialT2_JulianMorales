@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: DOSW-ParcialT2
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/dosw_parcial}   # local por defecto; en producción viene de variable de entorno
+
+server:
+  port: ${PORT:8080}
+
+jwt:
+  secret: ${JWT_SECRET}                # Base64, mínimo 44 caracteres. Nunca hardcodeado
+  expiration-ms: 3600000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
