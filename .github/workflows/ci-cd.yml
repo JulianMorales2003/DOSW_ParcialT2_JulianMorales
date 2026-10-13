@@ -34,12 +34,8 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_NAME }}:latest
 
-  # Despliegue en Azure: queda apagado hasta que exista el App Service.
-  # Para activarlo: Settings → Secrets and variables → Actions → Variables
-  # y crear la variable DEPLOY_AZURE con valor true.
   deploy:
     needs: docker
-    if: ${{ vars.DEPLOY_AZURE == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: azure/login@v2

@@ -19,16 +19,22 @@
 - **Profesor agregado al repositorio:** _(completar: marcar ✔ cuando esté agregado como colaborador)_
 
 ## 2. Descripción del proyecto
-Servicio backend base (Spring Boot + MongoDB) para el parcial práctico del segundo tercio de DOSW. Por ahora expone un endpoint de salud y la documentación Swagger; la lógica de negocio, la autenticación con JWT y los roles se implementan durante el laboratorio, sobre esta estructura MVC por capas.
+Servicio backend base (Spring Boot + MongoDB) para el parcial práctico del segundo tercio de DOSW. Por ahora expone un endpoint de salud y la documentación Swagger; la lógica de negocio, la autenticación con JWT y los roles se implementan durante el laboratorio, sobre esta estructura MVC por capas. La base de JWT ya está en `core/services/JwtService` (generación y validación de tokens con el secret y la expiración de la configuración), con sus pruebas unitarias.
 
 ## 3. Despliegue
 | Recurso | URL |
 |---|---|
-| Servicio en Azure | _(pendiente: despliegue en Azure)_ |
-| Health | _(pendiente)_ `/api/v1/health` |
-| Swagger | _(pendiente)_ `/swagger-ui/index.html` |
+| Servicio en Azure | `https://<nombre-app>.azurewebsites.net` |
+| Health | `https://<nombre-app>.azurewebsites.net/api/v1/health` |
+| Swagger | `https://<nombre-app>.azurewebsites.net/swagger-ui/index.html` |
 
-> Mientras el despliegue en Azure no esté disponible, el servicio se puede verificar en local (ver [Cómo ejecutar](#7-cómo-ejecutar)).
+Azure no permitió crear el App Service con la suscripción disponible, por lo que las URLs anteriores quedan como referencia (`<nombre-app>` es el nombre del App Service). La configuración de despliegue está completa en el repositorio:
+
+- La imagen Docker se construye y se publica en Docker Hub desde el pipeline.
+- El job `deploy` de [`ci-cd.yml`](.github/workflows/ci-cd.yml) despliega la imagen en Azure App Service.
+- Los comandos para crear los recursos en Azure están en [`docs/azure-despliegue.md`](docs/azure-despliegue.md).
+
+El servicio se verifica en local (ver [Cómo ejecutar](#7-cómo-ejecutar)).
 
 ## 4. Estructura del proyecto
 ```
@@ -120,21 +126,33 @@ Verificar: `http://localhost:8080/api/v1/health` y `http://localhost:8080/swagge
 mvn test
 mvn verify   # genera el reporte Jacoco en target/site/jacoco/index.html
 ```
-Evidencias: _(captura del resultado en verde)_ · _(captura del reporte Jacoco)_ → guardar en `docs`.
+Evidencias:
+
+![Pruebas en verde](docs/images/pruebas-verde.png)
+
+![Reporte Jacoco](docs/images/jacoco.png)
 
 ## 9. Docker
-Comandos de build y run en la sección 7. Evidencia: _(captura del contenedor corriendo)_ → `docs`.
+Comandos de build y run en la sección 7. Evidencia:
+
+![Contenedor corriendo](docs/images/docker-corriendo.png)
 
 ## 10. CI/CD
-Pipeline en `.github`, se ejecuta con cada push a `main` y `develop`:
+Pipeline en `.github/workflows/ci-cd.yml`, se ejecuta con cada push a `main` y `develop`:
 1. **test:** `mvn verify` (pruebas + Jacoco).
 2. **docker:** construye la imagen y la publica en Docker Hub.
-3. **deploy:** despliega en Azure App Service. Está condicionado a la variable de repositorio `DEPLOY_AZURE=true` y se activa cuando el App Service exista.
+3. **deploy:** despliega la imagen en Azure App Service.
 
 Secrets usados (solo nombres): `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `JWT_SECRET`, `AZURE_CREDENTIALS`, `AZURE_WEBAPP_NAME`.
 
-Evidencia: _(captura del workflow en verde)_ → `docs`.
+Evidencia:
+
+![Workflow](docs/images/workflow-verde.png)
 
 ## 11. Herramientas de modelado y diseño (evidencias)
-- Herramienta de modelado (Lucidchart / Draw.io / Miro): _(captura de la cuenta)_
-- Herramienta de diseño (Figma): _(captura de la cuenta)_
+- Herramienta de modelado (Lucidchart / Draw.io / Miro):
+
+![Cuenta de modelado](docs/images/cuenta-modelado.png)
+- Herramienta de diseño (Figma):
+
+![Cuenta de Figma](docs/images/cuenta-figma.png)
