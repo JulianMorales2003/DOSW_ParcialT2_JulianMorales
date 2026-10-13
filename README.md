@@ -186,3 +186,25 @@ esto se hace uno a uno, es decir solo entrega un mensaje de error , y va en orde
 por esta razón las respuestas deben ser en orden e individuales para cada uno de las condciones o errores que se hayan. 
 
 Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe crear ningun peddido o seguir con el flujo y no modificar datos, y se guyarda en memoria un pedido al estar completo y correcto. 
+
+
+## Punto 2 Preguntas para la revisión con Arquitectura: 
+
+### Diagramas: 
+
+#### a) Diagrama de componentes general:
+
+#### b) Diagrama de componentes específico siguiendo el esquema de MVC:
+
+#### c) Diagrama de clases: modelos de dominio:
+
+
+### - Preguntas para la revisión con Arquitectura: 
+
+##### ¿Qué problemas aparecen cuando no se separan correctamente las capas? Presenten un ejemplo del caso y expliquen cómo distribuyen sus responsabilidades.
+
+##### ¿Qué diferencia existe entre un validador, una utilidad y un servicio? Ubiquen un ejemplo de cada uno en su diseño e indiquen su responsabilidad.
+
+##### ¿Qué diferencia existe entre el Mapper IN y el Mapper OUT? Indiquen dónde se ubican y qué representaciones transforman cada uno.
+
+##### Retomen las tres reglas clasificadas en el paso anterior: ¿en qué componente debe ejecutarse cada una y por qué? 
