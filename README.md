@@ -194,7 +194,11 @@ Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe cr
 
 #### a) Diagrama de componentes general:
 
+![Diagrama de componentes general](docs/images/DComponentesGeneral.png)
+
 #### b) Diagrama de componentes específico siguiendo el esquema de MVC:
+
+![Diagrama de componentes específico MVC](docs/images/DComponentesEspecifico.png)
 
 #### c) Diagrama de clases: modelos de dominio:
 
