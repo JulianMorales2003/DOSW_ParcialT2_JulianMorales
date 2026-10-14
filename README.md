@@ -186,3 +186,70 @@ esto se hace uno a uno, es decir solo entrega un mensaje de error , y va en orde
 por esta razón las respuestas deben ser en orden e individuales para cada uno de las condciones o errores que se hayan. 
 
 Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe crear ningun peddido o seguir con el flujo y no modificar datos, y se guarda en memoria un pedido al estar completo y correcto. 
+
+## 5. Asignación del equipo de Calidad
+
+Los escenarios son del caso de uso **Hacer un pedido** (`POST /api/v1/orders`) y se construyen con TDD (Red, Green, Refactor).
+
+### 5.1 Orden de las validaciones
+
+Si un pedido falla por varias razones a la vez, la API informa **solo el primer error** según este orden:
+
+1. Token y rol (401 / 403)
+2. Validación de entrada: entre 1 y 5 productos, `delivery.type` válido, y bloque y salón presentes si es ENTREGA_SALON (400)
+3. Productos y extras existentes, y productos activos (404)
+4. Bloque A o B en ENTREGA_SALON (422)
+5. Subtotal mínimo de $3.500 (422)
+6. Cálculo del total y guardado del pedido como CONFIRMADO (201)
+
+El pedido se guarda **siempre al final**. Por eso, si algo falla antes, no se crea nada en la base de datos.
+
+### 5.2 Escenarios de prueba
+
+| ID | Escenario | Datos de entrada | Resultado esperado |
+|---|---|---|---|
+| T01 | Pedido válido (E14) | PROD-001 + EXT-001 + EXT-004, PARA_LLEVAR | 201. Subtotal $11.300, entrega $300, total $11.600, estado CONFIRMADO |
+| T02 | Pedido válido con entrega a salón | PROD-002 + EXT-003, ENTREGA_SALON bloque A, salón 101 | 201. Subtotal $5.500, entrega $1.000, total $6.500 |
+| T03 | Subtotal justo en el mínimo | PROD-004 ($3.500), CONSUMO_LOCAL | 201, porque el mínimo es inclusivo |
+| T04 | Bajo el mínimo (E4) | PROD-005 ($2.500) sin extras | 422. No se guarda el pedido |
+| T05 | Bloque inválido (E5) | ENTREGA_SALON bloque C | 422. No se guarda el pedido |
+| T06 | Seis productos (E06) | 6 productos en el pedido | 400. No se guarda el pedido |
+| T07 | Producto inexistente o inactivo (E02) | `productId` que no existe o con `active = false` | 404. No se guarda el pedido |
+| T08 | Extra inexistente (E03) | Extra `EXT-999` | 404. No se guarda el pedido |
+| T09 | Usuario y total desde el servidor | Body con `userId` ajeno y `total` manipulado | Se guarda con el `userId` del token y el total calculado por el servidor |
+| T10 | Sin token o rol ADMIN | Petición sin token / con token de ADMIN | 401 / 403 |
+| T11 | Varias fallas a la vez | 6 productos, bloque C y subtotal bajo | Solo se informa el error de entrada (400), que es el primero del orden |
+
+### 5.3 TDD (Red, Green, Refactor)
+
+Para cada escenario seguimos tres pasos:
+
+1. **Red:** escribimos la prueba antes que el código (por ejemplo T04) y comprobamos que falla.
+2. **Green:** escribimos lo mínimo para que pase (`if (subtotal < 3500) lanzar excepción`).
+3. **Refactor:** con las pruebas en verde, ordenamos el código (por ejemplo, mover el cálculo a `PriceCalculator`) y verificamos que todas sigan pasando.
+
+Empezamos por el pedido válido (T01) y luego pasamos a los rechazos, del más simple al más complejo.
+
+### 5.4 Cómo comprobamos el orden y que una falla no deja cambios
+
+- **No se crea el pedido:** en las pruebas con Mockito, en cada rechazo (T04 a T08) verificamos que `orderRepository.save()` nunca se llama (`verify(..., never())`).
+- **No se modifica el catálogo:** este caso de uso solo lee productos, así que verificamos que `productRepository.save()` tampoco se llama.
+- **Se respeta el orden:** T11 manda varios errores juntos y comprobamos que solo sale el primero del orden de la sección 5.1.
+
+### 5.5 Preguntas de revisión
+
+**¿Cómo aportan las pruebas evidencia del cumplimiento de las reglas de negocio? ¿Qué se verifica con pruebas unitarias?**
+
+Cada regla de negocio tiene al menos una prueba con datos conocidos y un resultado esperado que sale del contrato. Si alguien cambia el código y rompe la regla, la prueba falla. Así cada escenario del caso (E02, E03, E4, E5, E06, E14) queda cubierto por una prueba, incluyendo el caso límite del subtotal de $3.500 (T03).
+
+Con **pruebas unitarias** (JUnit y Mockito, con repositorios simulados) verificamos cada clase por separado:
+- El cálculo del subtotal, la entrega y el total.
+- Las reglas del Service: producto activo, extra existente, bloque A o B y subtotal mínimo.
+- Que ante una falla se lance la excepción correcta y no se guarde nada.
+- Que el usuario y el total vengan del servidor y no del body.
+
+Los códigos HTTP, el token y la conexión real con MongoDB se prueban aparte, con pruebas de integración.
+
+**¿Garantizan las pruebas por sí solas la ausencia de errores?**
+
+No. Una prueba solo demuestra que el sistema funciona en los casos que se nos ocurrió probar, pero pueden existir casos que no imaginamos. Además, tener 80 % de cobertura solo indica cuántas líneas se ejecutaron, no que las pruebas verifiquen lo correcto. Una prueba también puede pasar y estar validando una regla mal entendida. Por eso las pruebas se complementan con revisión de código, análisis estático y validación con el equipo de Producto.
