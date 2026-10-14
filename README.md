@@ -291,7 +291,7 @@ Un pedido se crea una vez y no se modifica: nace en estado CONFIRMADO. Esto mant
 si alguna validación falla no queda nada guardado a medias.
 
 ### Considere cómo se consultan y actualizan los datos, su posible duplicación y el crecimiento de los documentos. Expliquen una ventaja y una desventaja de la alternativa elegida.
-### 3.4 Duplicación, crecimiento, ventaja y desventaja
+### Duplicación, crecimiento, ventaja y desventaja
 
 **En cuanto a la duplicación de datos.** En cada producto del pedido copiamos el nombre y el precio que tenía al momento de la compra, y lo mismo con los extras. Es duplicación intencional puesto que un pedido funciona como una factura y debe recordar lo que realmente se cobró. Si mañana cambia el precio de un producto, los pedidos anteriores no se alteran.
 Además, no hay riesgo de inconsistencias, porque un pedido nunca se modifica después de creado. Del usuario y del producto solo guardamos el id (`userId` y `productId`).
