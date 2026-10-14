@@ -301,3 +301,43 @@ Además, no hay riesgo de inconsistencias, porque un pedido nunca se modifica de
 
 Diagrama se puede ver en la carpeta de imagenes, se adjunta la imagen acaa:
 ![Metamodelo conceptual NoSQL](docs/images/metamodelo-nosql-punto3.png)
+
+
+## Punto 4 Asignación del Equipo de Seguridad - Proteger el acceso y la información
+
+### ¿Cuál es la diferencia entre autenticación, autorización e integridad? Expliquen dónde y cómo aplicarán cada concepto en la API, con ejemplos del caso.
+
+Presentamos la repuesta en una tabla comparativaa: 
+- **Autenticación responde a la pregunta de ¿quién eres?** Se comprueba la identidad. En `POST /api/v1/auth/login` el usuario envía correo y contraseña; el sistema compara la contraseña con el hash guardado (BCrypt) y, si coincide, entrega un token JWT. Con credenciales inválidas o sin token responde **401**.
+- **Autorización responde a la pregunta de ¿qué puedes hacer?** Se verifica el permiso según el rol del token. Solo el ADMIN crea productos (`POST /api/v1/products`) y lista todos los pedidos (`GET /api/v1/orders`); solo el CLIENTE hace pedidos y ve los suyos. Un cliente que intenta crear un producto recibe **403**.
+- **Integridad: responde a la preguntaa de ¿los datos son confiables y no fueron alterados?** El token va firmado, así que si alguien cambia su contenido (por ejemplo, el rol) se rechaza. El total del pedido lo calcula el servidor, el `userId` sale del token y no del cuerpo de la petición, y la comunicación debe ir por HTTPS.
+
+### Seleccionen dos riesgos del OWASP Top 10 que se pueden encontrar en su API. Para cada uno, describan cómo se vería ese escenario aplicable a la fundacion, su mitigación y cómo verificarían que el control funciona.
+
+Se seleccionaron:
+
+**A03 Injection (inyección).**
+- Escenario: inyección NoSQL en el login, por ejemplo enviando `{"email": {"$ne": null}, "password": {"$ne": null}}` para entrar sin credenciales válidas.
+- Mitigación: para validar tipo y formato de cada dato de entrada con Bean Validation en los DTO (el correo debe ser texto con formato de email, el nombre de 3 a 60 caracteres, el precio numérico), rechazando con **400** antes de tocar la base de datos. Además, usar solo los repositorios de Spring Data y nunca armar consultas concatenando texto del usuario..
+  - Verificación: las ruebas que envíen objetos o caracteres especiales en el login y en la creación de productos, y comprueben que la respuesta es **400** y que no se devuelve ni se guarda ningún dato.
+
+**A01 Broken Access Control (control de acceso roto).**
+- Escenario: un cliente intenta ver los pedidos de otra persona, llamar al endpoint de administrador, o enviar el `userId` de otro para hacer un pedido a su nombre.
+- Mitigación: la autorización por rol en cada endpoint, y tomar siempre la identidad del token. `GET /api/v1/orders/me` filtra por el `userId` del token y no recibe ningún id del cliente.
+- Verificación: pruebas que comprueben que un token de CLIENTE en `GET /api/v1/orders` o `POST /api/v1/products` devuelve **403**, que sin token devuelve **401**, y que `/orders/me` nunca incluye pedidos de otro cliente.
+
+
+
+### ¿Cuál de los tipos de autenticación es el más adecuado para este MVP? Justifique su respuesta  
+
+Para este caso elegimos **JWT** 
+Descartamos **Basic Auth** porque envía la contraseña en cada petición, las **sesiones con cookies** porque exigen guardar estado en el servidor, y **OAuth2** 
+porque es demasiado complejo para un MVP con usuarios predefinidos. Las contraseñas se guardan con BCrypt, el token expira pronto y la clave de firma viene de 
+una variable de entorno, no del código.
+
+segun la eleccion, enviaddo en el encabezado `Authorization: Bearer <token>`:
+
+- **Sin estado:** el servidor no guarda sesiones; usuario y rol viajan dentro del token firmado. Encaja con una API REST desplegada en Azure.
+- **Resuelve nuestras reglas:** el token trae el `userId` y el rol, justo lo que necesitamos para autorizar y para asociar cada pedido a su dueño.
+- **Simple:** un login y un filtro que valide el token, sin servidores externos. Swagger lo soporta con el botón Authorize.
+
