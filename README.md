@@ -203,6 +203,7 @@ Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe cr
 
 #### c) Diagrama de clases: modelos de dominio:
 
+![diagrama-clases-dominio.png](docs/images/diagrama-clases-dominio.png)
 
 ### - Preguntas para la revisión con Arquitectura: 
 
