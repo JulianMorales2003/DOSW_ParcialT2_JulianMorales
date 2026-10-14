@@ -202,20 +202,18 @@ Si un pedido falla por varias razones a la vez, la API informa **solo el primer 
 5. Subtotal mínimo de $3.500 (422)
 6. Cálculo del total y guardado del pedido como CONFIRMADO (201)
 
-El pedido se guarda **siempre al final**. Por eso, si algo falla antes, no se crea nada en la base de datos.
-
 ### 5.2 Escenarios de prueba
 
 | ID | Escenario | Datos de entrada | Resultado esperado |
 |---|---|---|---|
-| T01 | Pedido válido (E14) | Una bandeja universitaria con porción extra de proteína y queso, para llevar | 201. Subtotal $11.300, entrega $300, total $11.600, estado CONFIRMADO |
+| T01 | Pedido válido  | Una bandeja universitaria con porción extra de proteína y queso, para llevar | 201. Subtotal $11.300, entrega $300, total $11.600, estado CONFIRMADO |
 | T02 | Pedido válido con entrega a salón | Un sándwich con pan integral, entregado en el salón 101 del bloque A | 201. Subtotal $5.500, entrega $1.000, total $6.500 |
 | T03 | Subtotal justo en el mínimo | Una sopa del día ($3.500), para consumir en la cafetería | 201, porque el mínimo es inclusivo |
-| T04 | Bajo el mínimo (E4) | Solo un jugo natural ($2.500), sin extras | 422. No se guarda el pedido |
-| T05 | Bloque inválido (E5) | Entrega a salón en el bloque C | 422. No se guarda el pedido |
-| T06 | Seis productos (E06) | Un pedido con 6 productos | 400. No se guarda el pedido |
-| T07 | Producto inexistente o inactivo (E02) | Un producto que no existe en el catálogo o que está desactivado | 404. No se guarda el pedido |
-| T08 | Extra inexistente (E03) | Un extra que no existe (por ejemplo, un código inventado) | 404. No se guarda el pedido |
+| T04 | Bajo el mínimo  | Solo un jugo natural ($2.500), sin extras | 422. No se guarda el pedido |
+| T05 | Bloque inválido  | Entrega a salón en el bloque C | 422. No se guarda el pedido |
+| T06 | Seis productos | Un pedido con 6 productos | 400. No se guarda el pedido |
+| T07 | Producto inexistente o inactivo  | Un producto que no existe en el catálogo o que está desactivado | 404. No se guarda el pedido |
+| T08 | Extra inexistente | Un extra que no existe (por ejemplo, un código inventado) | 404. No se guarda el pedido |
 | T09 | Usuario y total desde el servidor | Un pedido donde el cliente manda el `userId` de otra persona y un `total` modificado | Se guarda con el `userId` del token y el total calculado por el servidor |
 | T10 | Sin token o rol ADMIN | Pedido sin token / pedido con token de administrador | 401 / 403 |
 | T11 | Varias fallas a la vez | 6 productos, bloque C y subtotal bajo en el mismo pedido | Solo se informa el error de entrada (400), que es el primero del orden |
@@ -224,11 +222,11 @@ El pedido se guarda **siempre al final**. Por eso, si algo falla antes, no se cr
 
 Para cada escenario seguimos tres pasos:
 
-1. **Red:** escribimos la prueba antes que el código (por ejemplo T04) y comprobamos que falla.
+1. **Red:** escribimos la prueba antes que el código por ejemmplo T04 y comprobamos que falla.
 2. **Green:** escribimos lo mínimo para que pase (`if (subtotal < 3500) lanzar excepción`).
 3. **Refactor:** con las pruebas en verde, ordenamos el código (por ejemplo, mover el cálculo a `PriceCalculator`) y verificamos que todas sigan pasando.
 
-Empezamos por el pedido válido (T01) y luego pasamos a los rechazos, del más simple al más complejo.
+Empezamos por el pedido válido T01 y luego pasamos a los rechazos, del más simple al más complejo.
 
 ### 5.4 Cómo comprobamos el orden y que una falla no deja cambios
 
@@ -242,7 +240,7 @@ Empezamos por el pedido válido (T01) y luego pasamos a los rechazos, del más s
 
 Cada regla de negocio tiene al menos una prueba con datos conocidos y un resultado esperado que sale del contrato. Si alguien cambia el código y rompe la regla, la prueba falla. Así cada escenario del caso (E02, E03, E4, E5, E06, E14) queda cubierto por una prueba, incluyendo el caso límite del subtotal de $3.500 (T03).
 
-Con **pruebas unitarias** (JUnit y Mockito, con repositorios simulados) verificamos cada clase por separado:
+Con **pruebas unitarias** JUnit verificamos cada clase por separado:
 - El cálculo del subtotal, la entrega y el total.
 - Las reglas del Service: producto activo, extra existente, bloque A o B y subtotal mínimo.
 - Que ante una falla se lance la excepción correcta y no se guarde nada.
@@ -252,4 +250,4 @@ Los códigos HTTP, el token y la conexión real con MongoDB se prueban aparte, c
 
 **¿Garantizan las pruebas por sí solas la ausencia de errores?**
 
-No. Una prueba solo demuestra que el sistema funciona en los casos que se nos ocurrió probar, pero pueden existir casos que no imaginamos. Además, tener 80 % de cobertura solo indica cuántas líneas se ejecutaron, no que las pruebas verifiquen lo correcto. Una prueba también puede pasar y estar validando una regla mal entendida. Por eso las pruebas se complementan con revisión de código, análisis estático y validación con el equipo de Producto.
+No. Una prueba solo demuestra que el sistema funciona en los casos que se nos ocurrió probar, pero pueden existir casos que no imaginamos. Además, tener 80 % de cobertura solo indica cuántas líneas se ejecutaron, no que las pruebas verifiquen lo correcto. Una prueba también puede pasar y estar validando una regla que se puedo entender de la manera incorrecta. Por eso las pruebas se complementan con revisión de código y análisis estático.
