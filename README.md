@@ -291,7 +291,7 @@ Un pedido se crea una vez y no se modifica: nace en estado CONFIRMADO. Esto mant
 si alguna validación falla no queda nada guardado a medias.
 
 ### Considere cómo se consultan y actualizan los datos, su posible duplicación y el crecimiento de los documentos. Expliquen una ventaja y una desventaja de la alternativa elegida.
-### Duplicación, crecimiento, ventaja y desventaja
+### 3.4 Duplicación, crecimiento, ventaja y desventaja
 
 **En cuanto a la duplicación de datos.** En cada producto del pedido copiamos el nombre y el precio que tenía al momento de la compra, y lo mismo con los extras. Es duplicación intencional puesto que un pedido funciona como una factura y debe recordar lo que realmente se cobró. Si mañana cambia el precio de un producto, los pedidos anteriores no se alteran.
 Además, no hay riesgo de inconsistencias, porque un pedido nunca se modifica después de creado. Del usuario y del producto solo guardamos el id (`userId` y `productId`).
@@ -342,3 +342,145 @@ segun la eleccion, enviaddo en el encabezado `Authorization: Bearer <token>`:
 - **Resuelve nuestras reglas:** el token trae el `userId` y el rol, justo lo que necesitamos para autorizar y para asociar cada pedido a su dueño.
 - **Simple:** un login y un filtro que valide el token, sin servidores externos. Swagger lo soporta con el botón Authorize.
 
+
+## 5. Asignación del equipo de Calidad
+
+Los escenarios de prueba son del caso de uso **Hacer un pedido** (`POST /api/v1/orders`) y los construimos siguiendo TDD (Red, Green, Refactor).
+
+### 5.1 Orden de las validaciones
+
+Cuando un pedido falla por varias razones a la vez, la API solo informa el primer error, siguiendo este orden:
+
+1. Token y rol (401 / 403).
+2. Validación de entrada: entre 1 y 5 productos, tipo de entrega válido, y bloque y salón presentes si es ENTREGA_SALON (400).
+3. Que los productos existan y estén activos, y que los extras existan (404).
+4. Que el bloque sea A o B cuando la entrega es a salón (422).
+5. Que el subtotal sea de mínimo $3.500 (422).
+6. Cálculo del total y guardado del pedido como CONFIRMADO (201).
+
+El pedido se guarda siempre de último. Así, si algo falla antes, no queda nada nuevo en la base de datos.
+
+### 5.2 Escenarios de prueba
+
+| ID | Escenario | Datos de entrada | Resultado esperado |
+|---|---|---|---|
+| T01 | Pedido válido | Una bandeja universitaria con porción extra de proteína y queso, para llevar | 201. Subtotal $11.300, entrega $300, total $11.600, estado CONFIRMADO |
+| T02 | Pedido válido con entrega a salón | Un sándwich con pan integral, entregado en el salón 101 del bloque A | 201. Subtotal $5.500, entrega $1.000, total $6.500 |
+| T03 | Subtotal justo en el mínimo | Una sopa del día ($3.500), para consumir en la cafetería | 201, porque el mínimo es inclusivo |
+| T04 | Bajo el mínimo | Solo un jugo natural ($2.500), sin extras | 422. No se guarda el pedido |
+| T05 | Bloque inválido  | Entrega a salón en el bloque C | 422. No se guarda el pedido |
+| T06 | Seis productos | Un pedido con 6 productos | 400. No se guarda el pedido |
+| T07 | Producto inexistente o inactivo  | Un producto que no está en el catálogo o que está desactivado | 404. No se guarda el pedido |
+| T08 | Extra inexistente | Un extra con un código inventado | 404. No se guarda el pedido |
+| T09 | Usuario y total desde el servidor | El cliente manda el `userId` de otra persona y un `total` modificado | Se guarda con el `userId` del token y el total calculado por el servidor |
+| T10 | Sin token o rol ADMIN | Pedido sin token / pedido con token de administrador | 401 / 403 |
+| T11 | Varias fallas a la vez | 6 productos, bloque C y subtotal bajo en el mismo pedido | Solo se informa el error de entrada (400), que es el primero del orden |
+
+### 5.3 Cómo aplicamos TDD
+
+Con cada escenario hacemos tres pasos:
+
+1. **Red:** escribimos la prueba antes que el código (por ejemplo, T04) y comprobamos que falla.
+2. **Green:** escribimos lo mínimo para que pase, por ejemplo, lanzar una excepción si el subtotal es menor a $3.500.
+3. **Refactor:** con las pruebas en verde, ordenamos el código (por ejemplo, mover el cálculo a `PriceCalculator`) y revisamos que todo siga pasando.
+
+Empezamos por el pedido válido (T01) y después pasamos a los rechazos, del más simple al más complejo.
+
+### 5.4 Cómo comprobamos el orden y que una falla no deja cambios
+
+- **No se crea el pedido:** en las pruebas con Mockito, en cada rechazo (T04 a T08) verificamos que `orderRepository.save()` nunca se llama. El repositorio se simula, así que estas pruebas no dependen de MongoDB; la conexión real con la base de datos la comprobamos aparte, con las pruebas funcionales en Swagger.
+- **No se modifica el catálogo:** este caso de uso solo lee productos, así que verificamos que `productRepository.save()` tampoco se llama.
+- **Se respeta el orden:** en T11 mandamos varios errores juntos y comprobamos que solo sale el primero de la lista de la sección 5.1.
+
+### 5.5 Preguntas de revisión
+
+**¿Cómo aportan las pruebas evidencia del cumplimiento de las reglas de negocio? ¿Qué se verifica con pruebas unitarias?**
+
+Cada regla de negocio tiene al menos una prueba con datos conocidos y un resultado esperado que sale del contrato de la API. Si alguien cambia el código y rompe una regla, la prueba falla y nos damos cuenta. Así, cada escenario del caso (E02, E03, E4, E5, E06 y E14) queda cubierto, incluyendo el caso límite del subtotal de $3.500 (T03).
+
+Con las pruebas unitarias (JUnit y Mockito, con repositorios simulados) revisamos cada clase por separado:
+
+- Que el subtotal, la entrega y el total se calculen bien.
+- Que el Service aplique sus reglas: producto activo, extra existente, bloque A o B y subtotal mínimo.
+- Que ante una falla se lance la excepción correcta y no se guarde nada.
+- Que el usuario y el total salgan del servidor y no de lo que mande el cliente.
+
+Los códigos HTTP, el token y la conexión real con MongoDB se comprueban aparte, con pruebas de integración y funcionales.
+
+**¿Garantizan las pruebas por sí solas la ausencia de errores?**
+
+No. Una prueba solo demuestra que el sistema funciona en los casos que se nos ocurrió probar, y pueden existir otros que no imaginamos. Además, tener 80 % de cobertura solo dice cuántas líneas se ejecutaron, no que las pruebas revisen lo correcto. Una prueba incluso puede pasar y estar validando una regla mal entendida. Por eso las pruebas se complementan con revisión de código, análisis estático y validación con el equipo de Producto.
+
+**¿Garantizan las pruebas por sí solas la ausencia de errores?**
+
+No. Una prueba solo demuestra que el sistema funciona en los casos que se nos ocurrió probar, pero pueden existir casos que no imaginamos. Además, tener 80 % de cobertura solo indica cuántas líneas se ejecutaron, no que las pruebas verifiquen lo correcto. Una prueba también puede pasar y estar validando una regla que se puedo entender de la manera incorrecta. Por eso las pruebas se complementan con revisión de código y análisis estático.
+
+## 6. Asignación del equipo de DevOps
+
+### 6.1 Diagrama de despliegue
+
+![Diagrama de despliegue](docs/images/DDespliegue.png)
+
+*Figura 6. Diagrama de despliegue de University Food Hub.*
+
+Este diagrama muestra dónde va a funcionar la aplicación una vez esté en línea y cómo se comunican sus partes. Lo organizamos en cuatro nodos:
+
+| Elemento | Qué es | Qué tiene |
+|---|---|---|
+| Computador o celular del usuario | Dispositivo | El navegador o Swagger UI, desde donde se hacen las peticiones |
+| Azure App Service | Servidor donde corre la API | Java 21 y el archivo `food-hub.jar` (nuestra aplicación Spring Boot) |
+| MongoDB Atlas | Base de datos | Las colecciones `users`, `products` y `orders` |
+| GitHub Actions | Servidor de integración | El pipeline que compila, prueba y despliega |
+
+Las conexiones entre ellos son estas:
+
+| De | A | Cómo se comunican |
+|---|---|---|
+| Usuario | Azure App Service | HTTPS, con peticiones REST en formato JSON |
+| Azure App Service | MongoDB Atlas | Protocolo de MongoDB, por el puerto 27017 y con conexión cifrada |
+| GitHub Actions | Azure App Service | Despliegue del `.jar` usando el perfil de publicación |
+
+Los datos sensibles, como la cadena de conexión a MongoDB y la clave del JWT, no van escritos en el código. Los configuramos como variables de entorno en Azure, y el perfil de publicación lo guardamos como secreto en GitHub.
+
+Decidimos separar el dispositivo, la aplicación y la base de datos para que cada parte se pueda cambiar o ampliar sin tocar las demás. Además, el usuario nunca habla directamente con la base de datos: todo pasa por la API, que es la que aplica las reglas y revisa los permisos.
+
+### 6.2 Preguntas de revisión
+
+**¿Cuáles son las etapas principales de un pipeline CI/CD y para qué sirve cada una?**
+
+Un pipeline es una serie de pasos automáticos que se ejecutan cada vez que se integra código. Los nuestros son:
+
+1. **Descargar el código:** trae la última versión de la rama `develop`.
+2. **Compilar:** Maven construye el proyecto y avisa si hay errores o dependencias que faltan.
+3. **Ejecutar las pruebas:** corren las pruebas unitarias para confirmar que las reglas de negocio siguen funcionando.
+4. **Cobertura y análisis estático:** JaCoCo revisa que las pruebas cubran más del 80 % del código, y el análisis estático busca malas prácticas y posibles fallas de seguridad.
+5. **Empaquetar:** se genera el `.jar`, que es el archivo listo para ejecutar.
+6. **Desplegar:** se publica el `.jar` en Azure App Service.
+
+Los pasos 1 al 5 son la integración continua (CI), que revisa que cada cambio esté bien. El paso 6 es el despliegue continuo (CD), que lo deja funcionando para los usuarios.
+
+**¿Qué pasa si una prueba falla? ¿Se debe permitir el despliegue?**
+
+Si una prueba falla, el pipeline se detiene ahí y los pasos siguientes no se ejecutan. No se debe desplegar, porque una prueba que falla indica que algo dejó de cumplirse, por ejemplo que ahora se aceptan pedidos por debajo del mínimo de $3.500. Si lo desplegáramos, ese error llegaría a los usuarios reales. Lo correcto es arreglar el código, volver a correr el pipeline y desplegar solo cuando todo salga en verde.
+
+**¿Para qué sirven los logs y qué registraríamos para investigar un pedido fallido o un error de autenticación?**
+
+Los logs son el diario de la aplicación: van guardando lo que pasa mientras funciona. Sirven para descubrir qué falló, cuándo y por qué, sin tener que adivinar ni reproducir el error.
+
+- **Pedido fallido:** fecha y hora, el `userId`, la regla que falló (por ejemplo, "subtotal de $2.500 menor al mínimo") y el código HTTP que se devolvió.
+- **Error de autenticación:** fecha y hora, el correo con el que intentaron entrar, el motivo real (el usuario no existe, la contraseña no coincide o el token venció) y la IP de origen.
+
+También usamos niveles según la gravedad: `INFO` para lo normal (un pedido creado), `WARN` para rechazos esperados (una regla de negocio incumplida) y `ERROR` para fallas inesperadas (por ejemplo, que se caiga la base de datos).
+
+**¿Qué información es útil registrar y cuál no se debe registrar nunca?**
+
+| Sí registrar | No registrar |
+|---|---|
+| Id del pedido y del usuario | Contraseñas, ni en texto ni encriptadas |
+| Código HTTP y regla que falló | El token JWT completo |
+| Fecha, hora y nivel del log | La cadena de conexión a MongoDB o claves secretas |
+| IP de origen en errores de login | Datos personales que no hagan falta |
+
+**¿En qué se diferencia el log interno del mensaje que recibe el cliente?**
+
+El log interno es para el equipo, así que lleva todo el detalle técnico: la excepción completa, dónde ocurrió y el motivo exacto. El mensaje al cliente tiene que ser corto, claro y sin datos sensibles. Por ejemplo, en un login fallido el log dice "la contraseña no coincide", pero el cliente solo recibe "Credenciales inválidas", para no darle pistas a quien intente adivinar cuentas. Con los errores inesperados pasa igual: el cliente ve "Error interno del servidor" y el detalle queda solo en el log.
