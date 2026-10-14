@@ -186,3 +186,55 @@ esto se hace uno a uno, es decir solo entrega un mensaje de error , y va en orde
 por esta razón las respuestas deben ser en orden e individuales para cada uno de las condciones o errores que se hayan. 
 
 Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe crear ningun peddido o seguir con el flujo y no modificar datos, y se guarda en memoria un pedido al estar completo y correcto. 
+
+
+## Punto 3 Asignación del Equipo de Base de datos - Diseño de la persistencia:
+
+### Decisión 
+
+Para guardar la información de University Food Hub usamos MongoDB con tres colecciones: `users`, `products` y `orders`. Decidimos un **modelo híbrido**, es decir, combinamos dos formas de relacionar datos:
+
+- **Embebido:** guardar un dato *dentro* de otro documento. Aquí, `delivery`, `items` y `extras` viven dentro del pedido (`orders`).
+- **Referenciado:** guardar solo el *id* de otro documento que vive en su propia colección. Aquí, `orders.userId` apunta a `users._id` y `items[].productId` apunta a `products._id`.
+
+
+
+En el metamodelo, los recuadros dentro de `orders` son lo embebido y las flechas punteadas son las referencias.
+
+### Razón de la decisión
+
+A partir de los puntos anteriores y de los diagramas realizados deicmos que:
+Lo que no existe sin el pedido se embebe. La entrega, los productos del pedido y sus extras nacen con el pedido y siempre se consultan con él. En el diagrama de clases esto es una *composición* (rombo relleno). 
+Como un pedido se muestra siempre completo, tenerlo todo junto permite leerlo con **una sola consulta**, sin uniones, y guardarlo de una sola vez.
+
+Por otro lado lo que tiene vida propia se referencia.Un usuario o un producto existen por sí solos: el producto se crea con `POST /api/v1/products` y el usuario inicia sesión con `POST /api/v1/auth/login`. 
+En el diagrama de clases esto es una asociación. Por eso viven en su propia colección y el pedido solo guarda su id.
+
+Se decide hacer hibirdo y no solo embebido porque copiaríamos usuarios y productos completos en cada pedido, y cualquier cambio obligaría a corregir muchos documentos. y no todo referenciado puesto que 
+para mostrar un solo pedido haría falta consultar varias colecciones, algo innecesario cuando el pedido es pequeño y siempre se lee completo. por esta razón se decide hacer en el modelo hibrido descrito.
+
+### Forma como se consultan y actualizan los datos
+
+| Operación del contrato | Qué hace el modelo |
+|---|---|
+| `POST /api/v1/auth/login` | Busca el usuario por `email` (índice único). |
+| `POST /api/v1/products` | Inserta en `products`. El índice único en `name`, sin distinguir mayúsculas, evita duplicados (409). |
+| `POST /api/v1/orders` | Lee cada producto por `_id` para validar que exista y esté activo. Luego guarda el pedido completo en **una sola operación**. |
+| `GET /api/v1/orders/me` | Busca por `userId` (tomado del token) y ordena por fecha descendente. Usa el índice `{userId: 1, createdAt: -1}`. |
+| `GET /api/v1/orders` | Lista todos los pedidos ordenados por fecha descendente. Usa el índice `{createdAt: -1}`. |
+
+Un pedido se crea una vez y no se modifica: nace en estado CONFIRMADO. Esto mantiene el modelo simple, y como MongoDB guarda un documento de forma atómica, 
+si alguna validación falla no queda nada guardado a medias.
+
+### Considere cómo se consultan y actualizan los datos, su posible duplicación y el crecimiento de los documentos. Expliquen una ventaja y una desventaja de la alternativa elegida.
+### 3.4 Duplicación, crecimiento, ventaja y desventaja
+
+**En cuanto a la duplicación de datos.** En cada producto del pedido copiamos el nombre y el precio que tenía al momento de la compra, y lo mismo con los extras. Es duplicación intencional puesto que un pedido funciona como una factura y debe recordar lo que realmente se cobró. Si mañana cambia el precio de un producto, los pedidos anteriores no se alteran.
+Además, no hay riesgo de inconsistencias, porque un pedido nunca se modifica después de creado. Del usuario y del producto solo guardamos el id (`userId` y `productId`).
+
+**En cuanto al crecimiento de los documentos.** Las reglas de negocio limitan el tamaño de un pedido: máximo 5 productos, extras de un catálogo fijo y una sola entrega. Por eso cada documento ocupa pocos kilobytes, muy por debajo del límite de 16 MB de MongoDB. Lo que crece es la cantidad de pedidos, y eso lo resuelven los índices `{userId: 1, createdAt: -1}` y `{createdAt: -1}`.
+
+**En cuantoo a las Ventajas y desventajas.** La ventaja es que un pedido se lee y se guarda completo en una sola operación, sin unir colecciones, y conserva los precios del momento de la compra. La desventaja es que hay datos copiados, por lo que se usa algo más de almacenamiento y los pedidos antiguos no reflejan cambios posteriores del producto. Para conocer su estado actual hay que consultar `products` por id.
+
+Diagrama se puede ver en la carpeta de imagenes, se adjunta la imagen acaa:
+![Metamodelo conceptual NoSQL](docs/images/metamodelo-nosql-.png)
