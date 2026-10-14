@@ -414,8 +414,6 @@ No. Una prueba solo demuestra que el sistema funciona en los casos que se nos oc
 
 No. Una prueba solo demuestra que el sistema funciona en los casos que se nos ocurrió probar, pero pueden existir casos que no imaginamos. Además, tener 80 % de cobertura solo indica cuántas líneas se ejecutaron, no que las pruebas verifiquen lo correcto. Una prueba también puede pasar y estar validando una regla que se puedo entender de la manera incorrecta. Por eso las pruebas se complementan con revisión de código y análisis estático.
 
-![Metamodelo conceptual NoSQL](docs/images/metamodelo-nosql-.png)
-
 ## 6. Asignación del equipo de DevOps
 
 ### 6.1 Diagrama de despliegue
