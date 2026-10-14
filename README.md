@@ -300,4 +300,4 @@ Además, no hay riesgo de inconsistencias, porque un pedido nunca se modifica de
 **En cuantoo a las Ventajas y desventajas.** La ventaja es que un pedido se lee y se guarda completo en una sola operación, sin unir colecciones, y conserva los precios del momento de la compra. La desventaja es que hay datos copiados, por lo que se usa algo más de almacenamiento y los pedidos antiguos no reflejan cambios posteriores del producto. Para conocer su estado actual hay que consultar `products` por id.
 
 Diagrama se puede ver en la carpeta de imagenes, se adjunta la imagen acaa:
-![Metamodelo conceptual NoSQL](docs/images/metamodelo-nosql-.png)
+![Metamodelo conceptual NoSQL](docs/images/metamodelo-nosql-punto3.png)
