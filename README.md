@@ -290,7 +290,7 @@ Un pedido se crea una vez y no se modifica: nace en estado CONFIRMADO. Esto mant
 si alguna validación falla no queda nada guardado a medias.
 
 ### Considere cómo se consultan y actualizan los datos, su posible duplicación y el crecimiento de los documentos. Expliquen una ventaja y una desventaja de la alternativa elegida.
-### Duplicación, crecimiento, ventaja y desventaja
+### 3.4 Duplicación, crecimiento, ventaja y desventaja
 
 **En cuanto a la duplicación de datos.** En cada producto del pedido copiamos el nombre y el precio que tenía al momento de la compra, y lo mismo con los extras. Es duplicación intencional puesto que un pedido funciona como una factura y debe recordar lo que realmente se cobró. Si mañana cambia el precio de un producto, los pedidos anteriores no se alteran.
 Además, no hay riesgo de inconsistencias, porque un pedido nunca se modifica después de creado. Del usuario y del producto solo guardamos el id (`userId` y `productId`).
@@ -413,3 +413,75 @@ No. Una prueba solo demuestra que el sistema funciona en los casos que se nos oc
 **¿Garantizan las pruebas por sí solas la ausencia de errores?**
 
 No. Una prueba solo demuestra que el sistema funciona en los casos que se nos ocurrió probar, pero pueden existir casos que no imaginamos. Además, tener 80 % de cobertura solo indica cuántas líneas se ejecutaron, no que las pruebas verifiquen lo correcto. Una prueba también puede pasar y estar validando una regla que se puedo entender de la manera incorrecta. Por eso las pruebas se complementan con revisión de código y análisis estático.
+
+![Metamodelo conceptual NoSQL](docs/images/metamodelo-nosql-.png)
+
+## 6. Asignación del equipo de DevOps
+
+### 6.1 Diagrama de despliegue
+
+![Diagrama de despliegue](docs/images/DDespliegue.png)
+
+*Figura 6. Diagrama de despliegue de University Food Hub.*
+
+Este diagrama muestra dónde va a funcionar la aplicación una vez esté en línea y cómo se comunican sus partes. Lo organizamos en cuatro nodos:
+
+| Elemento | Qué es | Qué tiene |
+|---|---|---|
+| Computador o celular del usuario | Dispositivo | El navegador o Swagger UI, desde donde se hacen las peticiones |
+| Azure App Service | Servidor donde corre la API | Java 21 y el archivo `food-hub.jar` (nuestra aplicación Spring Boot) |
+| MongoDB Atlas | Base de datos | Las colecciones `users`, `products` y `orders` |
+| GitHub Actions | Servidor de integración | El pipeline que compila, prueba y despliega |
+
+Las conexiones entre ellos son estas:
+
+| De | A | Cómo se comunican |
+|---|---|---|
+| Usuario | Azure App Service | HTTPS, con peticiones REST en formato JSON |
+| Azure App Service | MongoDB Atlas | Protocolo de MongoDB, por el puerto 27017 y con conexión cifrada |
+| GitHub Actions | Azure App Service | Despliegue del `.jar` usando el perfil de publicación |
+
+Los datos sensibles, como la cadena de conexión a MongoDB y la clave del JWT, no van escritos en el código. Los configuramos como variables de entorno en Azure, y el perfil de publicación lo guardamos como secreto en GitHub.
+
+Decidimos separar el dispositivo, la aplicación y la base de datos para que cada parte se pueda cambiar o ampliar sin tocar las demás. Además, el usuario nunca habla directamente con la base de datos: todo pasa por la API, que es la que aplica las reglas y revisa los permisos.
+
+### 6.2 Preguntas de revisión
+
+**¿Cuáles son las etapas principales de un pipeline CI/CD y para qué sirve cada una?**
+
+Un pipeline es una serie de pasos automáticos que se ejecutan cada vez que se integra código. Los nuestros son:
+
+1. **Descargar el código:** trae la última versión de la rama `develop`.
+2. **Compilar:** Maven construye el proyecto y avisa si hay errores o dependencias que faltan.
+3. **Ejecutar las pruebas:** corren las pruebas unitarias para confirmar que las reglas de negocio siguen funcionando.
+4. **Cobertura y análisis estático:** JaCoCo revisa que las pruebas cubran más del 80 % del código, y el análisis estático busca malas prácticas y posibles fallas de seguridad.
+5. **Empaquetar:** se genera el `.jar`, que es el archivo listo para ejecutar.
+6. **Desplegar:** se publica el `.jar` en Azure App Service.
+
+Los pasos 1 al 5 son la integración continua (CI), que revisa que cada cambio esté bien. El paso 6 es el despliegue continuo (CD), que lo deja funcionando para los usuarios.
+
+**¿Qué pasa si una prueba falla? ¿Se debe permitir el despliegue?**
+
+Si una prueba falla, el pipeline se detiene ahí y los pasos siguientes no se ejecutan. No se debe desplegar, porque una prueba que falla indica que algo dejó de cumplirse, por ejemplo que ahora se aceptan pedidos por debajo del mínimo de $3.500. Si lo desplegáramos, ese error llegaría a los usuarios reales. Lo correcto es arreglar el código, volver a correr el pipeline y desplegar solo cuando todo salga en verde.
+
+**¿Para qué sirven los logs y qué registraríamos para investigar un pedido fallido o un error de autenticación?**
+
+Los logs son el diario de la aplicación: van guardando lo que pasa mientras funciona. Sirven para descubrir qué falló, cuándo y por qué, sin tener que adivinar ni reproducir el error.
+
+- **Pedido fallido:** fecha y hora, el `userId`, la regla que falló (por ejemplo, "subtotal de $2.500 menor al mínimo") y el código HTTP que se devolvió.
+- **Error de autenticación:** fecha y hora, el correo con el que intentaron entrar, el motivo real (el usuario no existe, la contraseña no coincide o el token venció) y la IP de origen.
+
+También usamos niveles según la gravedad: `INFO` para lo normal (un pedido creado), `WARN` para rechazos esperados (una regla de negocio incumplida) y `ERROR` para fallas inesperadas (por ejemplo, que se caiga la base de datos).
+
+**¿Qué información es útil registrar y cuál no se debe registrar nunca?**
+
+| Sí registrar | No registrar |
+|---|---|
+| Id del pedido y del usuario | Contraseñas, ni en texto ni encriptadas |
+| Código HTTP y regla que falló | El token JWT completo |
+| Fecha, hora y nivel del log | La cadena de conexión a MongoDB o claves secretas |
+| IP de origen en errores de login | Datos personales que no hagan falta |
+
+**¿En qué se diferencia el log interno del mensaje que recibe el cliente?**
+
+El log interno es para el equipo, así que lleva todo el detalle técnico: la excepción completa, dónde ocurrió y el motivo exacto. El mensaje al cliente tiene que ser corto, claro y sin datos sensibles. Por ejemplo, en un login fallido el log dice "la contraseña no coincide", pero el cliente solo recibe "Credenciales inválidas", para no darle pistas a quien intente adivinar cuentas. Con los errores inesperados pasa igual: el cliente ve "Error interno del servidor" y el detalle queda solo en el log.
