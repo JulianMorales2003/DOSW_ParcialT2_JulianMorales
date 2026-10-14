@@ -245,64 +245,66 @@ Diagrama se puede ver en la carpeta de imagenes, se adjunta la imagen acaa:
 
 ![Diagrama de despliegue](docs/images/DDespliegue.png)
 
-*Figura X. Diagrama de despliegue de University Food Hub.*
+*Figura 6. Diagrama de despliegue de University Food Hub.*
 
-**Nodos y dispositivos**
+Este diagrama muestra dónde va a funcionar la aplicación una vez esté en línea y cómo se comunican sus partes. Lo organizamos en cuatro nodos:
 
-| Elemento | Tipo | Qué contiene |
+| Elemento | Qué es | Qué tiene |
 |---|---|---|
-| Computador o celular del usuario | Dispositivo | Navegador web o Swagger UI que consume la API |
-| Azure App Service | Nodo (entorno de ejecución) | JRE 21 y el artefacto `food-hub.jar` (Spring Boot) |
-| MongoDB | Nodo (base de datos) | Colecciones `users`, `products` y `orders` |
-| GitHub / GitHub Actions | Nodo (integración) | Repositorio y pipeline que construye y despliega |
+| Computador o celular del usuario | Dispositivo | El navegador o Swagger UI, desde donde se hacen las peticiones |
+| Azure App Service | Servidor donde corre la API | Java 21 y el archivo `food-hub.jar` (nuestra aplicación Spring Boot) |
+| MongoDB Atlas | Base de datos | Las colecciones `users`, `products` y `orders` |
+| GitHub Actions | Servidor de integración | El pipeline que compila, prueba y despliega |
 
-**Comunicación entre nodos**
+Las conexiones entre ellos son estas:
 
-| Origen | Destino | Mecanismo |
+| De | A | Cómo se comunican |
 |---|---|---|
-| Dispositivo del usuario | Azure App Service | HTTPS (REST con JSON, puerto 443) |
-| Azure App Service | MongoDB | Protocolo de MongoDB (puerto 27017, conexión cifrada) |
-| GitHub Actions | Azure App Service | Despliegue del `.jar` autenticado con el perfil de publicación |
+| Usuario | Azure App Service | HTTPS, con peticiones REST en formato JSON |
+| Azure App Service | MongoDB Atlas | Protocolo de MongoDB, por el puerto 27017 y con conexión cifrada |
+| GitHub Actions | Azure App Service | Despliegue del `.jar` usando el perfil de publicación |
 
-**Especificación del despliegue:** las credenciales (cadena de conexión a MongoDB, clave del JWT) no están en el código sino en variables de entorno configuradas en Azure App Service. El perfil de publicación se guarda como secreto en GitHub.
+Los datos sensibles, como la cadena de conexión a MongoDB y la clave del JWT, no van escritos en el código. Los configuramos como variables de entorno en Azure, y el perfil de publicación lo guardamos como secreto en GitHub.
 
-**Justificación:** separar el dispositivo, la aplicación y la base de datos permite cambiar o escalar cada parte sin afectar a las otras. Además, la API nunca expone la base de datos directamente al usuario.
+Decidimos separar el dispositivo, la aplicación y la base de datos para que cada parte se pueda cambiar o ampliar sin tocar las demás. Además, el usuario nunca habla directamente con la base de datos: todo pasa por la API, que es la que aplica las reglas y revisa los permisos.
 
 ### 6.2 Preguntas de revisión
 
-**¿Cuáles son las etapas principales de un pipeline CI/CD y qué propósito tiene cada una?**
+**¿Cuáles son las etapas principales de un pipeline CI/CD y para qué sirve cada una?**
 
-1. **Checkout:** descarga el código de la rama `develop`.
-2. **Build (compilación):** compila el proyecto con Maven y verifica que no haya errores de sintaxis ni dependencias faltantes.
-3. **Pruebas:** ejecuta las pruebas unitarias con JUnit y Mockito para comprobar que las reglas de negocio siguen funcionando.
-4. **Cobertura y análisis estático:** JaCoCo mide que la cobertura sea superior al 80 % y el análisis estático busca malas prácticas o vulnerabilidades.
-5. **Empaquetado:** genera el `.jar` listo para ejecutar.
-6. **Despliegue (CD):** publica el `.jar` en Azure App Service.
+Un pipeline es una serie de pasos automáticos que se ejecutan cada vez que se integra código. Los nuestros son:
 
-CI (integración continua) abarca las etapas 1 a 5 y verifica cada cambio de forma automática. CD (despliegue continuo) es la etapa 6.
+1. **Descargar el código:** trae la última versión de la rama `develop`.
+2. **Compilar:** Maven construye el proyecto y avisa si hay errores o dependencias que faltan.
+3. **Ejecutar las pruebas:** corren las pruebas unitarias para confirmar que las reglas de negocio siguen funcionando.
+4. **Cobertura y análisis estático:** JaCoCo revisa que las pruebas cubran más del 80 % del código, y el análisis estático busca malas prácticas y posibles fallas de seguridad.
+5. **Empaquetar:** se genera el `.jar`, que es el archivo listo para ejecutar.
+6. **Desplegar:** se publica el `.jar` en Azure App Service.
 
-**¿Qué sucede si una prueba falla? ¿Debe permitirse el despliegue?**
+Los pasos 1 al 5 son la integración continua (CI), que revisa que cada cambio esté bien. El paso 6 es el despliegue continuo (CD), que lo deja funcionando para los usuarios.
 
-El pipeline se detiene en esa etapa y las siguientes no se ejecutan. **No debe permitirse el despliegue**, porque una prueba fallida indica que una regla de negocio dejó de cumplirse (por ejemplo, que se acepten pedidos bajo el mínimo de $3.500). Si se desplegara, el error llegaría a los usuarios reales. Lo correcto es corregir el código, volver a ejecutar el pipeline y desplegar solo cuando todo esté en verde.
+**¿Qué pasa si una prueba falla? ¿Se debe permitir el despliegue?**
+
+Si una prueba falla, el pipeline se detiene ahí y los pasos siguientes no se ejecutan. No se debe desplegar, porque una prueba que falla indica que algo dejó de cumplirse, por ejemplo que ahora se aceptan pedidos por debajo del mínimo de $3.500. Si lo desplegáramos, ese error llegaría a los usuarios reales. Lo correcto es arreglar el código, volver a correr el pipeline y desplegar solo cuando todo salga en verde.
 
 **¿Para qué sirven los logs y qué registraríamos para investigar un pedido fallido o un error de autenticación?**
 
-Los logs son el registro de lo que hace la aplicación mientras funciona. Sirven para saber qué pasó, cuándo y por qué falló algo, sin necesidad de reproducir el error.
+Los logs son el diario de la aplicación: van guardando lo que pasa mientras funciona. Sirven para descubrir qué falló, cuándo y por qué, sin tener que adivinar ni reproducir el error.
 
-- **Pedido fallido:** fecha y hora, identificador del usuario (`userId`), la regla que falló (por ejemplo, "subtotal $2.500 menor al mínimo"), el código HTTP devuelto y los códigos de los productos involucrados.
-- **Error de autenticación:** fecha y hora, el correo que intentó entrar, el motivo interno (usuario no existe o contraseña incorrecta), la IP de origen y si el token estaba vencido o mal formado.
+- **Pedido fallido:** fecha y hora, el `userId`, la regla que falló (por ejemplo, "subtotal de $2.500 menor al mínimo") y el código HTTP que se devolvió.
+- **Error de autenticación:** fecha y hora, el correo con el que intentaron entrar, el motivo real (el usuario no existe, la contraseña no coincide o el token venció) y la IP de origen.
 
-Se usan los niveles según la gravedad: `INFO` para operaciones normales (pedido creado), `WARN` para rechazos esperados (regla de negocio incumplida) y `ERROR` para fallas inesperadas (base de datos caída).
+También usamos niveles según la gravedad: `INFO` para lo normal (un pedido creado), `WARN` para rechazos esperados (una regla de negocio incumplida) y `ERROR` para fallas inesperadas (por ejemplo, que se caiga la base de datos).
 
-**Ejemplos de información útil y de datos que no deben registrarse**
+**¿Qué información es útil registrar y cuál no se debe registrar nunca?**
 
-| Útil para rastrear | No debe registrarse |
+| Sí registrar | No registrar |
 |---|---|
-| Id del pedido y del usuario | Contraseñas (ni en texto ni en hash) |
+| Id del pedido y del usuario | Contraseñas, ni en texto ni encriptadas |
 | Código HTTP y regla que falló | El token JWT completo |
-| Fecha, hora y nivel del log | Cadena de conexión a MongoDB ni claves secretas |
-| IP de origen en errores de login | Datos personales innecesarios |
+| Fecha, hora y nivel del log | La cadena de conexión a MongoDB o claves secretas |
+| IP de origen en errores de login | Datos personales que no hagan falta |
 
-**¿Qué diferencia debe existir entre el log interno y el mensaje que recibe el cliente?**
+**¿En qué se diferencia el log interno del mensaje que recibe el cliente?**
 
-El log interno tiene todo el detalle técnico para que el equipo encuentre el problema: la excepción completa, la clase donde ocurrió y el motivo exacto. El mensaje al cliente debe ser corto, claro y sin información sensible. Por ejemplo, en un login fallido el log dice "usuario no existe" o "contraseña incorrecta", pero el cliente solo recibe "Credenciales inválidas", para no revelar qué dato falló. Igual en un error inesperado: el cliente ve "Error interno del servidor" y el detalle queda solo en el log.
+El log interno es para el equipo, así que lleva todo el detalle técnico: la excepción completa, dónde ocurrió y el motivo exacto. El mensaje al cliente tiene que ser corto, claro y sin datos sensibles. Por ejemplo, en un login fallido el log dice "la contraseña no coincide", pero el cliente solo recibe "Credenciales inválidas", para no darle pistas a quien intente adivinar cuentas. Con los errores inesperados pasa igual: el cliente ve "Error interno del servidor" y el detalle queda solo en el log.
