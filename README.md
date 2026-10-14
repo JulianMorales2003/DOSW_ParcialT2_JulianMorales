@@ -22,19 +22,52 @@
 Servicio backend base (Spring Boot + MongoDB) para el parcial práctico del segundo tercio de DOSW. Por ahora expone un endpoint de salud y la documentación Swagger; la lógica de negocio, la autenticación con JWT y los roles se implementan durante el laboratorio, sobre esta estructura MVC por capas. La base de JWT ya está en `core/services/JwtService` (generación y validación de tokens con el secret y la expiración de la configuración), con sus pruebas unitarias.
 
 ## 3. Despliegue
+
 | Recurso | URL |
 |---|---|
-| Servicio en Azure | `https://<nombre-app>.azurewebsites.net` |
-| Health | `https://<nombre-app>.azurewebsites.net/api/v1/health` |
-| Swagger | `https://<nombre-app>.azurewebsites.net/swagger-ui/index.html` |
+| Servicio en Azure | https://foodhub-julian-2026.azurewebsites.net |
+| Health | https://foodhub-julian-2026.azurewebsites.net/api/v1/health |
+| Swagger | https://foodhub-julian-2026.azurewebsites.net/swagger-ui/index.html |
 
-Azure no me permitió crear el App Service con la suscripción disponible por problemas de la cuenta estudiantil, por lo que las URLs anteriores quedan como referencia (`<nombre-app>` es el nombre del App Service). La configuración de despliegue está completa en el repositorio:
+La API corre en **Azure App Service** (Linux) como un contenedor. La imagen se construye y se publica en Docker Hub (`julianmorales17/dosw-parcial-t2:latest`) desde el pipeline, y Azure la descarga de ahí. La base de datos es **MongoDB Atlas**.
 
-- La imagen Docker se construye y se publica en Docker Hub desde el pipeline.
-- El job `deploy` de [`ci-cd.yml`](.github/workflows/ci-cd.yml) despliega la imagen en Azure App Service.
-- Los comandos para crear los recursos en Azure están en [`docs/azure-despliegue.md`](docs/azure-despliegue.md).
+| Recurso de Azure | Valor |
+|---|---|
+| Grupo de recursos | `rg-dosw-parcial` |
+| Plan de App Service | `plan-dosw-parcial` (Linux, B1) |
+| App Service | `foodhub-julian-2026` |
+| Región | Spain Central |
 
-El servicio se verifica en local (ver [Cómo ejecutar](#7-cómo-ejecutar)).
+Mi suscripción de estudiante restringe las regiones donde se pueden crear recursos. Por eso el plan se creó en Spain Central y no en East US.
+
+### Configuración del App Service
+Las credenciales no están en el código. Se configuran como variables de entorno del App Service:
+
+| Variable | Descripción |
+|---|---|
+| `MONGODB_URI` | Cadena de conexión a MongoDB Atlas |
+| `JWT_SECRET` | Secret de los tokens JWT, en Base64 |
+| `WEBSITES_PORT` | `8080`, el puerto en que escucha el contenedor |
+
+### Cómo se creó
+```bash
+az group create --name rg-dosw-parcial --location eastus2
+
+az appservice plan create --name plan-dosw-parcial \
+  --resource-group rg-dosw-parcial --is-linux --sku B1 --location spaincentral
+
+az webapp create --name foodhub-julian-2026 \
+  --resource-group rg-dosw-parcial --plan plan-dosw-parcial \
+  --container-image-name julianmorales17/dosw-parcial-t2:latest
+
+az webapp config appsettings set --name foodhub-julian-2026 \
+  --resource-group rg-dosw-parcial \
+  --settings MONGODB_URI="<cadena-atlas>" JWT_SECRET="<secret-base64>" WEBSITES_PORT=8080
+
+az ad sp create-for-rbac --name dosw-parcial-sp --role contributor \
+  --scopes /subscriptions/<subscription-id>/resourceGroups/rg-dosw-parcial --sdk-auth
+```
+El JSON que devuelve el último comando se guarda como secreto `AZURE_CREDENTIALS` en GitHub. Después, cada integración en `develop` despliega automáticamente con el job `deploy` de [`ci-cd.yml`](.github/workflows/ci-cd.yml).
 
 ## 4. Estructura del proyecto
 ```
