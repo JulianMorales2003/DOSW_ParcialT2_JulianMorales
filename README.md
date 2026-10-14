@@ -242,8 +242,8 @@ Ejemplo del caso:
 
 ###### Componente que ejecuta cada regla
 
-| Regla | Tipo | Componente | Justificación |
-|---|---|---|---|
-| Nombre del producto de 3 a 60 caracteres | Entrada | **DTO + Controller** (`@Valid`, `@Size`) | Se evalúa solo con el request, sin consultar datos. Rechaza con 400 antes de llegar al Service. |
-| Subtotal mínimo de $3.500 | Negocio | **Service** (con `PriceCalculator`) | Depende de los precios reales de MongoDB, que el cliente no envía. Es una decisión del dominio y se rechaza con 422. |
-| ENTREGA_SALON solo en bloques A y B | Negocio | **Validador** (`DeliveryValidator`), invocado desde el Service | Es una política de la cafetería que puede cambiar, así que se aísla y se prueba de forma unitaria. Que `block` y `room` vengan presentes sí es validación de entrada (Controller). |
+| Regla                                       | Tipo | Componente | Justificación |
+|---------------------------------------------|---|---|---|
+| Nombre del producto de 3 a 60 caracteres    | Entrada | **DTO + Controller** (`@Valid`, `@Size`) | Se evalúa solo con el request, sin consultar datos. Rechaza con 400 antes de llegar al Service. |
+| Subtotal mínimo de $3.500                   | Negocio | **Service** (con `PriceCalculator`) | Depende de los precios reales de MongoDB, que el cliente no envía. Es una decisión del dominio y se rechaza con 422. |
+| producto del pedido existan y esten activos | Negocio | **Service** (con `OrderValidator` y `ProductRepository`) | Para saber si un producto existe y está activo hay que consultar MongoDB, algo que el request no trae. Es una decisión del dominio, no de formato, así que no va en el DTO ni en el Controller. El Service consulta los productos y el validador comprueba la regla. Si falla, se rechaza con 404 antes de guardar nada. |
