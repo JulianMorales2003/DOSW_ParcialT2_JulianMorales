@@ -185,7 +185,70 @@ Si fallan varias condiciones dentro del contexto de pedir un turno, la respuesta
 esto se hace uno a uno, es decir solo entrega un mensaje de error , y va en orden, primero las de entrada, luego revision sonbre existencia de productos y por ultimo las reglas de negocio, se hace así en orden y por etapas porque algunas reglas de negocio y entrada dependen unas de otras entonces
 por esta razón las respuestas deben ser en orden e individuales para cada uno de las condciones o errores que se hayan. 
 
-Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe crear ningun peddido o seguir con el flujo y no modificar datos, y se guarda en memoria un pedido al estar completo y correcto. 
+
+Una cosa que se debe evitar es el cambio de datos, pues si algo falla no debe crear ningun peddido o seguir con el flujo y no modificar datos, y se guyarda en memoria un pedido al estar completo y correcto. 
+
+
+## Punto 2 Preguntas para la revisión con Arquitectura: 
+
+### Diagramas: 
+
+#### a) Diagrama de componentes general:
+
+![Diagrama de componentes general](docs/images/DComponentesGeneral.png)
+
+#### b) Diagrama de componentes específico siguiendo el esquema de MVC:
+
+![Diagrama de componentes específico MVC](docs/images/DComponentesEspecifico.png)
+
+#### c) Diagrama de clases: modelos de dominio:
+
+
+### - Preguntas para la revisión con Arquitectura: 
+
+##### ¿Qué problemas aparecen cuando no se separan correctamente las capas? Presenten un ejemplo del caso y expliquen cómo distribuyen sus responsabilidades.
+
+Si las capas se mezclan, aparecen estos problemas:
+ - Alto acoplamiento: un cambio en MongoDB o en el formato de JSON obliga a tocar la lógica del negocio.
+ - Baja cohesión y duplicación: la misma regla se copia en varios endpoints.
+ - Poca testeabilidad: no se puede probar una regla sin levantar HTTP y la base de datos.
+ - Riesgos de seguridad: se expone la entidad de persistencia directamente.
+
+Ejemplo del caso:
+ - Si OrderController calcula el subtotal, valida el mínimo de $3.500 y consulta MongoDB, las reglas de precio quedan atadas a HTTP. Al agregar otro punto de entrada, habria que duplicarlas y se podrian omitir.
+
+  Distribucion de responsabilidades:
+  - Controller: Recibe el request, dispara la validación de entrada @Valid y devuelve el ResponseEntity con su codigo HTTP.
+  - Service: Orquesta el caso de uso y aplica las reglas de negocio como los productos activos, extras existentes, minimo, total.
+  - Repository: Solo accede a MongoDB
+  - Mapper: Convierte entre DTO y entidad.
+  - Model/Entity: Representa el dominio. 
+
+##### ¿Qué diferencia existe entre un validador, una utilidad y un servicio? Ubiquen un ejemplo de cada uno en su diseño e indiquen su responsabilidad.
+
+###### Validador, utilidad y servicio
+
+| Componente | Responsabilidad | Ejemplo |
+|---|---|---|
+| **Validador** | Verifica que un dato o regla se cumpla y rechaza si no. No orquesta ni persiste. | `DeliveryValidator`: ENTREGA_SALON exige bloque A o B y salón. |
+| **Utilidad** | Función auxiliar, sin estado y sin lógica de negocio, reutilizable en cualquier capa. | `JwtUtil` (generar y leer el token) o `DateUtil`. |
+| **Servicio** | Implementa el caso de uso: coordina validadores, repositorios y mappers, y aplica la lógica de negocio. | `OrderService.createOrder()`. |
+
+##### ¿Qué diferencia existe entre el Mapper IN y el Mapper OUT? Indiquen dónde se ubican y qué representaciones transforman cada uno.
+
+- Mapper IN (request): Convierte el DTO de entrada de entrada `CreateOrderRequest` a la entidad o modelo de dominio `Order`. Se ubica entre el Controller y el Service. Mantiene el contrato externo separado del modelo interno y datos como `userId`, `total` o `status` no vienen del cliente, sino que los asigna el servidor.
+- Mapper OUT (response): convierte la entidad `Order` al DTO de salida `OrderResponse`. Se ubica entre el Service y el Controller. Controla qué se expone: arma el desglose `subtotal`, `delivery.cost`, `total` y evita filtrar campos internos.
+
+##### Retomen las tres reglas clasificadas en el paso anterior: ¿en qué componente debe ejecutarse cada una y por qué? 
+
+###### Componente que ejecuta cada regla
+
+| Regla                                       | Tipo | Componente | Justificación |
+|---------------------------------------------|---|---|---|
+| Nombre del producto de 3 a 60 caracteres    | Entrada | **DTO + Controller** (`@Valid`, `@Size`) | Se evalúa solo con el request, sin consultar datos. Rechaza con 400 antes de llegar al Service. |
+| Subtotal mínimo de $3.500                   | Negocio | **Service** (con `PriceCalculator`) | Depende de los precios reales de MongoDB, que el cliente no envía. Es una decisión del dominio y se rechaza con 422. |
+| producto del pedido existan y esten activos | Negocio | **Service** (con `OrderValidator` y `ProductRepository`) | Para saber si un producto existe y está activo hay que consultar MongoDB, algo que el request no trae. Es una decisión del dominio, no de formato, así que no va en el DTO ni en el Controller. El Service consulta los productos y el validador comprueba la regla. Si falla, se rechaza con 404 antes de guardar nada. |
+
 
 
 ## Punto 3 Asignación del Equipo de Base de datos - Diseño de la persistencia:
