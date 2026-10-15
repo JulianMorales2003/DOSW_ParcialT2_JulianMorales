@@ -602,15 +602,6 @@ Ejemplo de salida (201):
 | 403 | El token es de un CLIENTE | `SecurityConfig` |
 | 409 | Ya existe un producto con ese nombre | `GlobalExceptionHandler` |
 
-#### Documentación en Swagger
-
-La API está documentada con Swagger y tiene el botón **Authorize** para ingresar el token JWT.
-
-![Swagger configurado](docs/images/swagger-configurado.png)
-
-El endpoint muestra todos los códigos de respuesta posibles:
-
-![Documentación del endpoint](docs/images/swagger-crear-documentacion.png)
 
 #### Pruebas funcionales
 
