@@ -517,3 +517,112 @@ También usamos niveles según la gravedad: `INFO` para lo normal (un pedido cre
 **¿En qué se diferencia el log interno del mensaje que recibe el cliente?**
 
 El log interno es para el equipo, así que lleva todo el detalle técnico: la excepción completa, dónde ocurrió y el motivo exacto. El mensaje al cliente tiene que ser corto, claro y sin datos sensibles. Por ejemplo, en un login fallido el log dice "la contraseña no coincide", pero el cliente solo recibe "Credenciales inválidas", para no darle pistas a quien intente adivinar cuentas. Con los errores inesperados pasa igual: el cliente ve "Error interno del servidor" y el detalle queda solo en el log.
+
+
+## Implementación y evidencias
+
+### Cómo ejecutar
+
+Variables de entorno necesarias (sin sus valores):
+
+| Variable | Para qué sirve |
+|---|---|
+| `MONGODB_URI` | Cadena de conexión a MongoDB Atlas |
+| `JWT_SECRET` | Clave para firmar los tokens, en Base64 y de mínimo 44 caracteres |
+
+Para correr la aplicación desde la raíz del proyecto, en PowerShell:
+
+```powershell
+$env:MONGODB_URI = "<cadena-de-conexion>"
+$env:JWT_SECRET = "<secret-base64>"
+mvn spring-boot:run
+```
+
+Para correr las pruebas y generar el reporte de JaCoCo:
+
+```bash
+mvn clean verify
+```
+
+| Recurso | URL |
+|---|---|
+| Swagger en producción | https://foodhub-julian-2026.azurewebsites.net/swagger-ui/index.html |
+| Swagger en local | http://localhost:8080/swagger-ui/index.html |
+
+### Estado de los casos de uso
+
+| # | Caso de uso | Estado |
+|---|---|---|
+| 1 | Crear productos | Implementado |
+| 2 | Hacer un pedido | Pendiente |
+| 3 | Listar mis pedidos | Pendiente |
+| 4 | Listar todos los pedidos | Pendiente |
+| 5 | Iniciar sesión | Pendiente |
+
+### 1. Crear productos
+
+`POST /api/v1/products`, solo para el rol **ADMIN**. Se desarrolló en la rama `feature/crear-productos`.
+
+Ejemplo de entrada:
+
+```json
+{
+  "name": "Sopa del día",
+  "price": 3500
+}
+```
+
+Ejemplo de salida (201):
+
+```json
+{
+  "id": "6710a1f2c3d4e5f607182930",
+  "name": "Sopa del día",
+  "price": 3500,
+  "active": true
+}
+```
+
+**Validaciones**
+
+| Tipo | Regla | Dónde se hace |
+|---|---|---|
+| Entrada | El nombre es obligatorio y tiene entre 3 y 60 caracteres | `CreateProductRequest` con `@Valid` |
+| Entrada | El precio es obligatorio y mayor a 0 | `CreateProductRequest` con `@Valid` |
+| Negocio | No puede existir otro producto con el mismo nombre, sin importar mayúsculas | `ProductService` |
+| Negocio | El producto nace con `active = true` | `ProductService` |
+
+**Códigos de respuesta**
+
+| Código | Cuándo | Quién lo genera |
+|---|---|---|
+| 201 | Producto creado | `ProductController` |
+| 400 | Nombre o precio inválidos, o JSON mal formado | `GlobalExceptionHandler` |
+| 401 | No hay token o es inválido | `SecurityConfig` |
+| 403 | El token es de un CLIENTE | `SecurityConfig` |
+| 409 | Ya existe un producto con ese nombre | `GlobalExceptionHandler` |
+
+**Cómo está organizado**
+
+| Capa | Clases |
+|---|---|
+| Controller | `ProductController`, `CreateProductRequest`, `ProductResponse`, `ErrorResponse`, `ProductMapper`, `GlobalExceptionHandler` |
+| Core | `ProductService`, `Product`, `ConflictException` |
+| Persistence | `ProductRepository`, `ProductEntity`, `ProductEntityMapper` |
+| Config | `SecurityConfig`, `JwtAuthenticationFilter`, `OpenApiConfig`, `MongoConfig` |
+
+El controlador recibe el DTO y lo pasa al servicio, que valida el nombre repetido y guarda con el repositorio. Los mappers convierten entre el DTO, el modelo y el documento de MongoDB. La seguridad la hace un filtro que lee el token, saca el rol y deja que Spring Security decida si puede entrar.
+
+**Logs**
+
+- `INFO`: cuando se recibe la solicitud y cuando se crea el producto, con su id.
+- `WARN`: cuando se rechaza por validación o por nombre repetido.
+
+La excepción completa no se le muestra al cliente; solo recibe un mensaje corto.
+
+**Evidencias**
+
+- [ ] Pruebas unitarias en verde
+- [ ] Reporte de JaCoCo
+- [ ] Prueba funcional en Swagger (201, 400, 401, 403 y 409)
+- [ ] Logs de la prueba funcional
