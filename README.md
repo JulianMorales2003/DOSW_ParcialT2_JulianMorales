@@ -602,6 +602,38 @@ Ejemplo de salida (201):
 | 403 | El token es de un CLIENTE | `SecurityConfig` |
 | 409 | Ya existe un producto con ese nombre | `GlobalExceptionHandler` |
 
+#### Documentación en Swagger
+
+La API está documentada con Swagger y tiene el botón **Authorize** para ingresar el token JWT.
+
+![Swagger configurado](docs/images/swagger-configurado.png)
+
+El endpoint muestra todos los códigos de respuesta posibles:
+
+![Documentación del endpoint](docs/images/swagger-crear-documentacion.png)
+
+#### Pruebas funcionales
+
+**201 – Producto creado** (token ADMIN):
+
+![Crear producto 201](docs/images/swagger-crear-201.png)
+
+**401 – Sin token:**
+
+![Crear producto 401](docs/images/swagger-crear-401.png)
+
+**409 – Nombre repetido** (mismo body del 201):
+
+![Crear producto 409](docs/images/swagger-crear-409.png)
+
+**400 – Datos inválidos** (`{"name":"ab","price":0}`):
+
+![Crear producto 400](docs/images/swagger-crear-400.png)
+
+**403 – Token de rol CLIENTE:**
+
+![Crear producto 403](docs/images/swagger-crear-403.png)
+
 **Cómo está organizado**
 
 | Capa | Clases |
